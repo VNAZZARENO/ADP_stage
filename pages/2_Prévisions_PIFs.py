@@ -106,7 +106,20 @@ with st.sidebar:
                                                                             'month_sin_time', 'month_cos_time'], 
                                                             default=['Local Date', 'Cie Ope', 'Prov Dest', 'Plage'])
 
+
+    class CustomXGBRegressor(xgb.XGBRegressor):
+        def _objective(self, y_pred, y_true):
+            
+            mse = np.mean(np.square(y_pred - y_true))
+            temporal_distance = np.mean(np.abs(np.argmax(y_pred, axis=1) - np.argmax(y_true, axis=1)))
+            total_loss = mse + 0.2 * temporal_distance
+            
+            # return mse, temporal_distance
+            return total_loss
+        
     uploaded_file_y = st.file_uploader("Fichier Programme Concat", type=["csv", "txt"])
+    uploaded_model_presentation = st.file_uploader("Modèle entrainé Présentation", type=["json"])
+    uploaded_model_repartition = st.file_uploader("Modèle entrainé Répartition", type=["json"])
     download_final_df = False
 
     
@@ -163,14 +176,24 @@ with st.sidebar:
       
 
 # Initiate the model building process
-if uploaded_file_y is not None and download_final_df != True:
-
+if uploaded_file_y is not None and download_final_df != True and uploaded_model_presentation is not None and uploaded_model_repartition is not None:
 
     st.warning('La requête a bien été prise en compte, début du traitement.\nNe tentez pas de fermer la fenêtre même si celle-ci semble figée.')
     placeholder = st.empty()
     my_bar = placeholder.progress(5)
     
-
+    st.write('Chargement du modèle ...')
+    @st.cache_data
+    def load_models():
+        # multioutputregressor_presentation = joblib.load(r"ressources\courbe_pres_multiouput_xgb.json") 
+        # multioutputregressor_repartition = joblib.load(r"ressources\courbe_rep_multiouput_xgb.json")
+        multioutputregressor_presentation = joblib.load(uploaded_model_presentation)
+        multioutputregressor_repartition = joblib.load(uploaded_model_repartition)
+        
+        return multioutputregressor_presentation, multioutputregressor_repartition
+    
+    multioutputregressor_presentation, multioutputregressor_repartition = load_models()
+    
     class CustomOneHotEncoder(BaseEstimator, TransformerMixin):
         def __init__(self, object_col):
             """Encode the data based on object column provided
@@ -385,26 +408,10 @@ if uploaded_file_y is not None and download_final_df != True:
     with st.status("Chargement du modèle ...", expanded=True) as status:
         
         
-        class CustomXGBRegressor(xgb.XGBRegressor):
-            def _objective(self, y_pred, y_true):
-                
-                mse = np.mean(np.square(y_pred - y_true))
-                temporal_distance = np.mean(np.abs(np.argmax(y_pred, axis=1) - np.argmax(y_true, axis=1)))
-                total_loss = mse + 0.2 * temporal_distance
-                
-                # return mse, temporal_distance
-                return total_loss
         
-        st.write('Chargement du modèle ...')
-        @st.cache_data
-        def load_models():
-            multioutputregressor_presentation = joblib.load(r"ressources\courbe_pres_multiouput_xgb.json") 
-            multioutputregressor_repartition = joblib.load(r"ressources\courbe_rep_multiouput_xgb.json")
-            return multioutputregressor_presentation, multioutputregressor_repartition
         
-        multioutputregressor_presentation, multioutputregressor_repartition = load_models()
         # st.write(xgb.plot_importance(multioutputregressor.estimator_[0], importance_type='weight'), max_num_features=10)
-        st.write('Modèle chargé, colonnes utilisées pour la prédiction: ', data.columns)
+        # st.write('Modèle chargé, colonnes utilisées pour la prédiction: ', data.columns)
     
         my_bar.progress(20)
 
@@ -977,7 +984,7 @@ if uploaded_file_y is not None and download_final_df != True:
         final_df.to_csv(f'pif_previ_ml.csv', index=False, sep=';', encoding='utf-8', decimal=',')
         # final_df_smoothed.to_csv(f'pif_previ_smoothed_ml.csv', index=False, sep=';', encoding='utf-8', decimal=',')
         # list_files = ['pif_previ_ml.csv', 'pif_previ_smoothed_ml.csv']
-        final_df.to_excel(f'pif_previ_ml.xlsx', index=False, encoding='utf-8', decimal=',')
+        final_df.to_excel(f'pif_previ_ml.xlsx', index=False, engine='openpyxl')
 
         list_files = ['pif_previ_ml.csv', 'pif_previ_ml.xlsx']
 

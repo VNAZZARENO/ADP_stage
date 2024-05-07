@@ -50,8 +50,11 @@ df_sheet = pd.DataFrame(
 st.divider()
 uploaded_file = st.file_uploader("Choose a file")
 if uploaded_file is not None:
-    # df = pd.read_excel(uploaded_file)
-    df = pd.read_csv(uploaded_file, sep=';', encoding='utf-8', engine='python', decimal=',', header=0)
+    df = pd.read_excel(uploaded_file, engine='pyxlsb', header=0)
+    # try:
+    #     df = pd.read_csv(uploaded_file, sep=';', encoding='utf-8', engine='python', decimal=',', header=0)
+    # except BadZipFile:
+        
     df['jour'] = pd.to_datetime(df['jour'], format='%Y-%m-%d')
     df['jour'] = df['jour'].apply(lambda x: x.strftime("%d/%m/%Y"))
     df['charge'] = df['charge'].astype(float)
@@ -70,7 +73,7 @@ if uploaded_file is not None:
     
     # jointure entre le df_final et le df combinaisons pour corriger le problème d'omission de colonne
     
-    df_complet =pd.merge(df, combinaisons, on = ['jour', 'heure','site'], how = "right")
+    df_complet = pd.merge(df, combinaisons, on = ['jour', 'heure','site'], how = "right")
     df_complet['charge'].fillna(0, inplace=True)
     
     df = df_complet
